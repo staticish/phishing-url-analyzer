@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phishing & URL Threat Analyzer</title>
+<style>
+  :root{--bg:#0b1016;--card:#121a24;--line:#1f2c3a;--fg:#e6eef5;--dim:#8aa0b4;--g:#3fe08f;--y:#ffc24b;--o:#ff8c42;--r:#ff5c6c;--c:#46d3ff}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--fg);font-family:"SF Mono",ui-monospace,Consolas,monospace;line-height:1.5;
+    background-image:radial-gradient(circle at 85% 0%,rgba(255,140,66,.08),transparent 42%)}
+  .wrap{max-width:920px;margin:0 auto;padding:28px 18px 80px}
+  .back{color:var(--c);text-decoration:none;font-size:13px}
+  .top{display:flex;align-items:center;gap:12px;margin:8px 0 4px}.top h1{font-size:24px;font-weight:800}.ic{font-size:26px}
+  .sub{color:var(--dim);font-size:14px;margin-bottom:22px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px}
+  textarea{width:100%;min-height:120px;background:#0a0f15;border:1.5px solid var(--line);border-radius:10px;color:#fff;font:inherit;font-size:14px;padding:13px;resize:vertical}
+  textarea:focus{outline:none;border-color:var(--c)}
+  button{background:#1a2634;border:1px solid var(--line);color:var(--fg);font:inherit;border-radius:10px;padding:11px 16px;cursor:pointer;margin-top:10px}
+  button.go{background:var(--c);color:#04141d;font-weight:800;border:0}
+  button:hover{filter:brightness(1.1)}
+  .pillrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .pill{font-size:12px;border:1px solid var(--line);border-radius:20px;padding:6px 12px;color:var(--dim);cursor:pointer}
+  .pill:hover{border-color:var(--c);color:#fff}
+  .score{display:flex;align-items:center;gap:18px}
+  .gauge{width:96px;height:96px;border-radius:50%;display:grid;place-items:center;font-size:30px;font-weight:800;flex:none}
+  .score h2{font-size:22px}.score p{color:var(--dim);font-size:13.5px;margin-top:3px}
+  .flag{margin:8px 0;padding:11px 13px;border-radius:9px;font-size:13.5px;border-left:3px solid;display:flex;gap:10px}
+  .flag .t{font-weight:800;flex:none}
+  .flag.bad{background:rgba(255,92,108,.08);border-color:var(--r)} .flag.bad .t{color:var(--r)}
+  .flag.warn{background:rgba(255,194,75,.08);border-color:var(--y)} .flag.warn .t{color:var(--y)}
+  .flag.good{background:rgba(63,224,143,.08);border-color:var(--g)} .flag.good .t{color:var(--g)}
+  .flag.info{background:rgba(70,211,255,.06);border-color:var(--c)} .flag.info .t{color:var(--c)}
+  h3{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin:6px 0 10px}
+  .note{font-size:13.5px;color:var(--dim);line-height:1.75}.note b{color:var(--fg)}.note code{background:#0a0f15;padding:1px 6px;border-radius:4px;color:var(--c)}
+  .kv{font-size:13px;color:var(--dim)}.kv b{color:var(--fg)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="index.html">← all projects</a>
+  <div class="top"><span class="ic">🎣</span><h1>Phishing &amp; URL Threat Analyzer</h1></div>
+  <div class="sub">Paste a <b>URL</b> or a raw <b>email header</b>. The analyzer flags the indicators a SOC analyst checks — and explains each one.</div>
+
+  <div class="card">
+    <textarea id="inp" placeholder="Paste a URL, e.g.  http://paypa1.secure-login.xyz/account/verify?id=…
+— or paste raw email headers (From:, Return-Path:, Authentication-Results: …)"></textarea>
+    <div><button class="go" id="go">⚡ Analyze</button></div>
+    <div class="pillrow">
+      <span class="pill" data-s="url-bad">⚠ sample: phishing URL</span>
+      <span class="pill" data-s="url-good">✓ sample: legit URL</span>
+      <span class="pill" data-s="mail-bad">⚠ sample: phishing email</span>
+    </div>
+  </div>
+
+  <div class="card" id="result" style="display:none">
+    <div class="score">
+      <div class="gauge" id="gauge">0</div>
+      <div><h2 id="verdict"></h2><p id="vsub"></p></div>
+    </div>
+    <div id="meta" style="margin-top:14px"></div>
+    <h3 style="margin-top:18px">Indicators</h3>
+    <div id="flags"></div>
+  </div>
+
+  <div class="card">
+    <h3>📚 What you're learning</h3>
+    <div class="note">
+      <p><b>Lookalike domains</b> are the #1 phishing trick: <code>paypa1.com</code>, <code>micros0ft-support.com</code>, or unicode homoglyphs (<code>аpple.com</code> with a Cyrillic “а” → punycode <code>xn--…</code>). Always read the domain right-to-left from the TLD.</p>
+      <p style="margin-top:10px"><b>The real domain is the bit just left of the TLD.</b> In <code>paypal.com.secure-verify.ru</code>, the actual host is <code>secure-verify.ru</code> — not PayPal. Subdomains lie.</p>
+      <p style="margin-top:10px"><b>Email auth — SPF / DKIM / DMARC:</b> SPF checks the sending IP is allowed; DKIM verifies a cryptographic signature; DMARC ties them to the visible <code>From:</code> and says what to do on failure. A <code>dmarc=fail</code> with a brand in the From line is a screaming red flag. Also watch <b>display-name spoofing</b> (“PayPal &lt;noreply@evil.ru&gt;”) and a <b>Reply-To</b> that differs from From.</p>
+      <p style="margin-top:10px"><b>Defender habit:</b> hover, don't click; verify the registrable domain; treat urgency (“account suspended — act now”) as a manipulation signal.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const SAMPLES={
+ "url-bad":"http://paypa1.secure-login.xyz/account/verify?session=8f3a&redirect=login@evil.ru",
+ "url-good":"https://github.com/login",
+ "mail-bad":`From: PayPal Service <security@paypa1-alerts.ru>
+Reply-To: recover@mailbox-secure.top
+Return-Path: <bounce@sendgrid-relay.ru>
+Subject: Urgent: Your account has been suspended - verify within 24 hours
+Authentication-Results: mx.google.com; spf=fail smtp.mailfrom=paypa1-alerts.ru; dkim=none; dmarc=fail (p=reject) header.from=paypal.com
+Received: from unknown (185.142.236.34) by mx.google.com`
+};
+const BRANDS=["paypal","apple","microsoft","google","amazon","netflix","facebook","instagram","bank","hsbc","barclays","dhl","fedex","ups","coinbase","outlook","office365","linkedin","whatsapp","gov"];
+const BADTLD=["zip","mov","xyz","top","tk","ml","ga","cf","gq","country","kim","work","review","click","link","rest","fit","ru","su"];
+const SHORTENERS=["bit.ly","tinyurl.com","goo.gl","t.co","ow.ly","is.gd","cutt.ly","rebrand.ly","shorturl.at"];
+
+function lev(a,b){const m=a.length,n=b.length,d=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);for(let j=0;j<=n;j++)d[0][j]=j;
+  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n];}
+
+function analyzeURL(raw){
+  const flags=[]; let score=0;
+  let u; try{u=new URL(raw.trim());}catch(e){ return {flags:[["bad","INVALID","Not a parseable URL — but attackers love malformed/obfuscated links too."]],score:40,meta:""}; }
+  const host=u.hostname.toLowerCase();
+  const parts=host.split(".");
+  const tld=parts[parts.length-1];
+  const reg=parts.slice(-2).join(".");
+  const meta=`<div class="kv">Scheme: <b>${u.protocol.replace(':','')}</b> · Host: <b>${host}</b> · Registrable domain: <b>${reg}</b> · Path: <b>${u.pathname||'/'}</b></div>`;
+  if(u.protocol==="http:"){score+=20;flags.push(["bad","NO TLS","Uses <code>http://</code> — no encryption. Legit logins are always HTTPS."]);}
+  else flags.push(["good","TLS","Uses HTTPS (encryption present — but HTTPS ≠ trustworthy; phishers get certs too)."]);
+  if(/^\d{1,3}(\.\d{1,3}){3}$/.test(host)){score+=30;flags.push(["bad","IP HOST","The host is a raw IP address — real services use domain names."]);}
+  if(raw.includes("@")&&raw.indexOf("@")<raw.length-1 && /\/\/[^/]*@/.test(raw)){score+=30;flags.push(["bad","@ TRICK","Contains <code>@</code> before the host — everything before it is ignored by the browser, hiding the true destination."]);}
+  if(host.startsWith("xn--")||host.includes(".xn--")){score+=30;flags.push(["bad","PUNYCODE","Internationalised domain (<code>xn--</code>) — often a homoglyph lookalike of a real brand."]);}
+  if(parts.length>=4){score+=12;flags.push(["warn","DEEP SUBDOMAIN","Many subdomains (<code>"+host+"</code>) — used to bury a brand name and look legit."]);}
+  if(BADTLD.includes(tld)){score+=15;flags.push(["warn","RISKY TLD",`The <code>.${tld}</code> TLD is cheap/abused and over-represented in phishing.`]);}
+  if(SHORTENERS.includes(reg)){score+=15;flags.push(["warn","SHORTENER","A URL shortener hides the real destination — expand before trusting."]);}
+  if(u.port){score+=10;flags.push(["warn","NON-STD PORT","Explicit port <code>:"+u.port+"</code> — unusual for normal web services."]);}
+  if(host.length>30||raw.length>90){score+=8;flags.push(["warn","LONG URL","Unusually long — a common tactic to push the real domain out of view on mobile."]);}
+  // brand impersonation
+  BRANDS.forEach(b=>{
+    if(parts.some(p=>p.replace(/[0-9]/g,m=>({'0':'o','1':'l','3':'e','5':'s'}[m]||m)).includes(b) && reg.split(".")[0]!==b)){
+      score+=22;flags.push(["bad","BRAND LURE",`Mentions “${b}” but the real domain is <code>${reg}</code> — classic impersonation.`]);}
+    const head=reg.split(".")[0];
+    if(head&&head!==b && lev(head,b)===1){score+=25;flags.push(["bad","TYPOSQUAT",`<code>${head}</code> is one character off “${b}” — typosquatting.`]);}
+  });
+  if(/login|verify|secure|account|update|confirm|signin|password|wallet/.test(u.pathname+host)){score+=6;flags.push(["info","CRED KEYWORDS","Contains credential/urgency words common in credential-harvesting pages."]);}
+  if(!flags.some(f=>f[0]==="bad")&&score<15)flags.push(["good","CLEAN","No strong phishing indicators in the URL structure."]);
+  return {flags,score:Math.min(100,score),meta};
+}
+
+function analyzeMail(raw){
+  const flags=[];let score=0;
+  const get=re=>{const m=raw.match(re);return m?m[1].trim():"";};
+  const from=get(/^from:\s*(.+)$/im);
+  const replyTo=get(/^reply-to:\s*(.+)$/im);
+  const returnPath=get(/^return-path:\s*<?([^>\n]+)>?/im);
+  const subject=get(/^subject:\s*(.+)$/im);
+  const auth=raw.match(/authentication-results:[\s\S]*?(?:\n\S|$)/i);
+  const authStr=auth?auth[0]:"";
+  const fromAddr=(from.match(/<([^>]+)>/)||[,from])[1];
+  const fromName=from.replace(/<[^>]+>/,"").replace(/"/g,"").trim();
+  const fromDom=(fromAddr.split("@")[1]||"").toLowerCase();
+  let meta=`<div class="kv">From: <b>${esc(from||"—")}</b><br>Reply-To: <b>${esc(replyTo||"—")}</b> · Return-Path: <b>${esc(returnPath||"—")}</b></div>`;
+  // SPF/DKIM/DMARC
+  const spf=(authStr.match(/spf=(\w+)/i)||[])[1];
+  const dkim=(authStr.match(/dkim=(\w+)/i)||[])[1];
+  const dmarc=(authStr.match(/dmarc=(\w+)/i)||[])[1];
+  const fail=v=>v&&/fail|softfail|none|temperror|permerror/i.test(v);
+  if(spf){ if(fail(spf)){score+=22;flags.push(["bad","SPF "+spf.toUpperCase(),"The sending server isn't authorised to send for this domain."]);} else flags.push(["good","SPF PASS","Sending IP is authorised by the domain's SPF record."]); }
+  if(dkim){ if(fail(dkim)){score+=20;flags.push(["bad","DKIM "+dkim.toUpperCase(),"No valid cryptographic signature — message may be forged/altered."]);} else flags.push(["good","DKIM PASS","Message carries a valid DKIM signature."]); }
+  if(dmarc){ if(fail(dmarc)){score+=28;flags.push(["bad","DMARC "+dmarc.toUpperCase(),"Fails alignment with the visible From — the strongest forgery signal."]);} else flags.push(["good","DMARC PASS","Aligned with the From domain."]); }
+  if(!spf&&!dkim&&!dmarc)flags.push(["info","NO AUTH RESULTS","No Authentication-Results header found — paste full headers for SPF/DKIM/DMARC."]);
+  // display-name spoofing
+  BRANDS.forEach(b=>{ if(fromName.toLowerCase().includes(b)&&fromDom&&!fromDom.includes(b)){score+=24;flags.push(["bad","DISPLAY-NAME SPOOF",`Shows “${esc(fromName)}” but actually from <code>${esc(fromDom)}</code>.`]);} });
+  // reply-to mismatch
+  if(replyTo&&fromAddr){const rt=(replyTo.match(/<([^>]+)>/)||[,replyTo])[1].split("@")[1]; if(rt&&fromDom&&rt.toLowerCase()!==fromDom){score+=16;flags.push(["warn","REPLY-TO MISMATCH",`Replies go to <code>${esc(rt)}</code>, not the sender's domain.`]);}}
+  // return-path mismatch
+  if(returnPath){const rp=returnPath.split("@")[1]; if(rp&&fromDom&&rp.toLowerCase()!==fromDom){score+=10;flags.push(["warn","RETURN-PATH MISMATCH",`Bounce domain <code>${esc(rp)}</code> differs from the From domain.`]);}}
+  // urgency
+  if(/urgent|suspend|verify|within \d+ hours|act now|immediately|locked|unusual activity/i.test(subject)){score+=10;flags.push(["warn","URGENCY","Subject uses pressure/urgency — a social-engineering lever."]);}
+  // lookalike from-domain
+  BRANDS.forEach(b=>{const head=fromDom.split(".")[0]; if(head&&head!==b&&(lev(head,b)===1||head.replace(/[0-9]/g,m=>({'0':'o','1':'l'}[m]||m))===b)){score+=22;flags.push(["bad","LOOKALIKE SENDER",`Sender domain <code>${esc(fromDom)}</code> mimics “${b}”.`]);}});
+  if(!flags.length)flags.push(["info","—","Couldn't parse headers — paste the raw header block."]);
+  return {flags,score:Math.min(100,score),meta};
+}
+function esc(s){return(s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+function run(){
+  const v=document.getElementById('inp').value.trim(); if(!v)return;
+  const isMail=/^(from|received|authentication-results|return-path|subject|reply-to):/im.test(v);
+  const res=isMail?analyzeMail(v):analyzeURL(v);
+  document.getElementById('result').style.display="block";
+  const g=document.getElementById('gauge'); g.textContent=res.score;
+  let col,verd,sub;
+  if(res.score>=55){col="var(--r)";verd="High risk — likely phishing";sub="Multiple strong indicators. Do not click / do not enter credentials.";}
+  else if(res.score>=25){col="var(--y)";verd="Suspicious";sub="Some warning signs. Verify the sender/domain independently before acting.";}
+  else{col="var(--g)";verd="Low risk";sub="No strong indicators found — but stay alert; absence of red flags ≠ safe.";}
+  g.style.background=`conic-gradient(${col} ${res.score*3.6}deg,#0a0f15 0)`; g.style.color="#fff";
+  g.style.boxShadow=`0 0 0 1px var(--line) inset`;
+  document.getElementById('verdict').textContent=verd; document.getElementById('verdict').style.color=col;
+  document.getElementById('vsub').textContent=sub;
+  document.getElementById('meta').innerHTML=res.meta;
+  document.getElementById('flags').innerHTML=res.flags.map(f=>`<div class="flag ${f[0]}"><span class="t">${f[1]}</span><span>${f[2]}</span></div>`).join("");
+  document.getElementById('result').scrollIntoView({behavior:"smooth"});
+}
+document.getElementById('go').onclick=run;
+document.querySelectorAll('.pill').forEach(p=>p.onclick=()=>{document.getElementById('inp').value=SAMPLES[p.dataset.s];run();});
+</script>
+</body>
+</html>
